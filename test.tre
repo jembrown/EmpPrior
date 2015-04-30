@@ -1,0 +1,21 @@
+#NEXUS
+BEGIN TREES;
+        Translate
+                1 Hypomesus_japonicus_10,
+                2 Hypomesus_japonicus_5,
+                3 Hypomesus_japonicus_8,
+                4 Hypomesus_nipponensis_1,
+                5 Hypomesus_nipponensis_5,
+                6 Hypomesus_nipponensis_7,
+                7 Hypomesus_olidus_1,
+                8 Hypomesus_olidus_4,
+                9 Hypomesus_pretiosus_1,
+                10 Hypomesus_pretiosus_BMS2,
+                11 Hypomesus_pretiosus_JB2,
+                12 Hypomesus_transpacificus_1,
+                13 Hypomesus_transpacificus_3,
+                14 Hypomesus_transpacificus_8,
+                15 Mallotus_villosus_TC2_outgroup
+                ;
+tree PAUP_1 = [&U] (1:0.000787,(2:0.000433,(((((4:0.000992,6:0.000654):0.000859,5:0.000463):0.028720,15:0.057305):0.007337,(7:0.000321,8:0.000996):0.014215):0.010881,((9:0.002093,(10:0.000977,11:0.001528):0.000285):0.001904,(12:0.000321,13:0.000944,14:0):0.004561):0.018491):0.024777):0.000904,3:0.002432);
+END;

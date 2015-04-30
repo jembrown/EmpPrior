@@ -209,6 +209,11 @@ for(i in 1:length(input$files)){
 	tree = read.nexus(file = input$files[i])
 
     dat = data.frame(el = tree$edge.length)
+
+	if(any(dat$el == 0)) {
+		stop("Tree must not contain 0-length branches. Exiting...")
+	}
+
     numEdges = length(tree$edge.length)
     numTips = length(tree$tip.label)
     tipIndex = match(1:numTips, tree$edge[,2])
