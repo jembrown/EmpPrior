@@ -1,4 +1,4 @@
-#!/usr/bin/env Rscript --vanilla --slave
+#!/usr/bin/Rscript --vanilla --slave
 
 # Usage: ./EmpPrior-fit.r [path/to/nexus1.nex path/to/nexus2.nex || folder=path/to/files folder=path/to/other/files] 
 #                         [outfile=path/to/EmpPrior-fit.out]
@@ -115,19 +115,19 @@ gamma.NLL = function(shape = 0, rate = 0) {
 }
 
 compDirichlet.NLL = function(shape=0, beta=0, concentration=0, c=0){
-  len_tip = length(tip.length)
-  len_internal = length(internal.length)
-  len_T = sum(tip.length) + sum(internal.length)
-  shp = exp(shape)
-  bt = exp(beta)
-  cnc = exp(concentration)
-  expc = exp(c)
-  logB = len_tip * lgamma(cnc) + len_internal * lgamma(cnc * expc) - lgamma(len_tip * cnc + len_internal * cnc * expc)
-  logLike = shp * log(bt) - lgamma(shp) - bt * len_T + (shp - 1) * log(len_T) - logB + 
-            sum(sapply(tip.length, function(x) log(x ^ (cnc - 1)))) + 
-            sum(sapply(internal.length, function(x) log(x ^ (cnc * expc - 1)))) +
-            (-cnc * len_tip - cnc * expc * len_internal + 1) * log(len_T)
-  return(-logLike)
+	len_tip = length(tip.length)
+	len_internal = length(internal.length)
+	len_T = sum(tip.length) + sum(internal.length)
+	shp = exp(shape)
+	bt = exp(beta)
+	cnc = exp(concentration)
+	expc = exp(c)
+	logB = len_tip * lgamma(cnc) + len_internal * lgamma(cnc * expc) - lgamma(len_tip * cnc + len_internal * cnc * expc)
+	logLike = shp * log(bt) - lgamma(shp) - bt * len_T + (shp - 1) * log(len_T) - logB +    
+	sum(sapply(tip.length, function(x) log(x ^ (cnc - 1)))) +
+	sum(sapply(internal.length, function(x) log(x ^ (cnc * expc - 1)))) +
+        (-cnc * len_tip - cnc * expc * len_internal + 1) * log(len_T)
+	return(-logLike)
 }
 
 models.aicc = function(names = c("fit.expon", "fit.gamma", "fit.compDirichlet.T", "fit.compDirichlet.Ta", 
@@ -209,6 +209,11 @@ for(i in 1:length(input$files)){
 	tree = read.nexus(file = input$files[i])
 
     dat = data.frame(el = tree$edge.length)
+
+	if(any(dat$el == 0)) {
+		stop("Tree must not contain 0-length branches. Exiting...")
+	}
+
     numEdges = length(tree$edge.length)
     numTips = length(tree$tip.label)
     tipIndex = match(1:numTips, tree$edge[,2])
