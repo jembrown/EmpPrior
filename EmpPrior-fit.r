@@ -6,6 +6,7 @@
 # Filenames cannot contain "="
 # Multiple files or folders can be specified
 # Treefiles must be in nexus format
+# If a folder is specified, it should ONLY contain treefiles
 
 # Updates: 
 # v0.1.1 -> v0.2: The compound Dirichlet negative log-likelihood function has been updated
