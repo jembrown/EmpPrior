@@ -14,26 +14,38 @@ public class TreeBaseConnectionMT extends SwingWorker<String, String>
 	private BufferedReader br;
 	private String[] gene;
 	private int minInd;
-	private int maxInd;					// JMB
+	private int maxInd;
 	private JTextArea result; 
 	public String baseUrl = "http://purl.org/phylo/treebase/phylows/study/TB2:";
-	private Vector<String> fileNames = new Vector<String>();								// JMB
+	private Vector<String> fileNames = new Vector<String>();
+	private Vector<String> warnings = new Vector<String>();
+	private Vector<String> delGeneNames = new Vector<String>();
+	
+	private boolean extractFlag;
 	
 	/*
 	 * Take text from text field and split into an array. Each item in the array 
 	 * should be some gene
 	 */
-	public TreeBaseConnectionMT(String gene, String minInd, String maxInd, JTextArea result) throws IOException
+	 
+	public TreeBaseConnectionMT(){
+	};
+	 
+	public void set(String gene, String minInd, String maxInd, JTextArea result, boolean extractFlag) throws IOException
 	{
-	
-		// Splits based on "s followed by some amount of whitespace -- JMB
+		
+		// Splits based on "s followed by some amount of whitespace
 		this.gene = gene.split("\"\\s+");
 		this.minInd = Integer.parseInt(minInd);
-		this.maxInd = Integer.parseInt(maxInd);										// JMB
+		this.maxInd = Integer.parseInt(maxInd);
 		this.result = result;
-		
-		if(this.gene.length == 1)
-			this.gene[0] = this.gene[0].substring(1,this.gene[0].length()-1);		// JMB -- changed start index to 1
+		this.extractFlag = extractFlag;
+	}
+	
+	public void quoteWarning(){
+		publish("WARNING: You did not surround your gene names with the proper number of quotation marks.");
+		publish("Please re-enter gene names and try again.");
+		publish("");
 	}
 	
 	protected String doInBackground()
@@ -41,17 +53,21 @@ public class TreeBaseConnectionMT extends SwingWorker<String, String>
 		
 		try
 		{
-			for (int gCount=0; gCount < gene.length; gCount++){						// Added iterator over all gene names -- JMB
+			
+			if (extractFlag)
+				publish("\nWill attempt to extract gene from Nexus file. Results may be unreliable, especially when gene names are common strings.\n");
+		
+			for (int gCount=0; gCount < gene.length; gCount++){						// Added iterator over all gene names
 																					// Changed all instances of gene[0] to gene[gCount]
 
-				gene[gCount] = gene[gCount].replace("\"","");						// Strips off parentheses -- JMB
+				gene[gCount] = gene[gCount].replace("\"","");						// Strips off parentheses
 
 				setProgress(100 * gCount / gene.length);
 
-				ExecutorService executor = Executors.newFixedThreadPool(10);		// Moved this line inside loop across gene names - JMB
+				ExecutorService executor = Executors.newFixedThreadPool(10);		// Moved this line inside loop across gene names
 
 				// Query TreeBase with first array item (first gene entered).
-				publish("Searching for genes with name "+gene[gCount]+"...");		// JMB
+				publish("Searching for genes with name "+gene[gCount]+"...");
 				input = new URL("http://treebase.org/treebase-web/search/studySearch.html?query=dcterms.abstract=\""+gene[gCount]+"\"");
 				br = new BufferedReader(new InputStreamReader(input.openStream()));
 
@@ -72,63 +88,101 @@ public class TreeBaseConnectionMT extends SwingWorker<String, String>
 					publish("No results found for gene "+gene[gCount]+".");
 				}
 
-				if (urlVector.size() > 0){									// JMB
+				if (urlVector.size() > 0){
 
 					// Assign a thread to each nexus file and send to GetANexusFile class
 					for (int i = 0; i < urlVector.size(); i++)
 					{
-						fileNames.add( urlVector.elementAt(i).replace("?format=nexus","")+"_"+gene[gCount]+".nex" );						// JMB
-						executor.execute(new GetANexusFile(urlVector.elementAt(i), gene, gCount, i, minInd, maxInd, fileNames));		// JMB
-						// setProgress now accounts for >1 gene		// JMB
-						setProgress(((100 * i / (urlVector.size()*gene.length)) + (100 * gCount / gene.length)));			// JMB
-						publish("Retrieving nexus"+i+": http://purl.org/phylo/treebase/phylows/study/TB2:"+urlVector.elementAt(i));
-						try{
-							Thread.sleep(100);
+						if (!isCancelled()){
+							fileNames.add( urlVector.elementAt(i).replace("?format=nexus","")+"_"+gene[gCount]+".nex" );
+							executor.execute(new GetANexusFile(urlVector.elementAt(i), gene, gCount, i, minInd, maxInd, fileNames, warnings, extractFlag, delGeneNames));
+							// setProgress now accounts for >1 gene		// JMB
+							setProgress(((100 * i / (urlVector.size()*gene.length)) + (100 * gCount / gene.length)));
+							publish("Retrieving nexus"+i+": http://purl.org/phylo/treebase/phylows/study/TB2:"+urlVector.elementAt(i));
+							try{
+								Thread.sleep(100);
+							}
+							catch (InterruptedException ie) {}
 						}
-						catch (InterruptedException ie) {}
 					}
 
-						publish("Parsing nexus files...");
+					if (isCancelled()){
+						publish("");
+						publish("Nexus retrieval cancelled by the user. All files not retrieved. Skipping downstream processing. Attempting to quit elegantly.");
+						publish("");
+					}
+					
+					if (!isCancelled())
+						publish("\nParsing nexus files...\n");
 
 				}
 
 				executor.shutdown();
 
-				while(!executor.isTerminated()) {}
+				while(!executor.isTerminated() && !isCancelled()) {
+
+					if (!warnings.isEmpty()){
+						Iterator<String> warnItr = warnings.iterator();
+						while (warnItr.hasNext())
+							publish(warnItr.next());
+						warnings.removeAllElements();
+					}
+					
+					if (!delGeneNames.isEmpty()){
+						Iterator<String> delGeneItr = delGeneNames.iterator();
+						while (delGeneItr.hasNext())
+							publish("File "+delGeneItr.next()+" was deleted because it did not meet requirements.");
+						delGeneNames.removeAllElements();
+					}
+					
+				}
+
+				if (isCancelled())
+					publish("\nFile parsing not complete due to user cancellation.\n");
+
+				
 
 				publish("");
 			}
 
-			// This code block looks for duplicate files with the same study ID 	// JMB
+			// This code block looks for duplicate files with the same study ID
 
-			publish("Looking for duplicate files...");
-			Vector<String> baseNames = new Vector<String>();						// JMB
-			Iterator<String> fileNameItr = fileNames.iterator();					// JMB
-			while (fileNameItr.hasNext()) {											// JMB
-				String fileToCheck = fileNameItr.next();							// JMB
-				// System.out.println("Examining "+fileToCheck);					// JMB
-				// Extract base name from fileToCheck								// JMB
-				for (int gCount=0; gCount < gene.length; gCount++){					// JMB
-					if (fileToCheck.indexOf(gene[gCount]) > -1){					// JMB
-						int geneNameIndex = fileToCheck.indexOf("_"+gene[gCount]);	// JMB
-						String currBase = fileToCheck.substring(0,geneNameIndex);	// JMB
-						if ( baseNames.indexOf(currBase) > -1 ) {					// JMB
-							try {													// JMB
-								new File(fileToCheck).delete();						// JMB
-								publish(fileToCheck+" was deleted.");	// JMB
-							} catch (Exception noFile) {							// JMB
-								System.err.println("Problem deleting file: "+fileToCheck);	// JMB
-							}														// JMB
-						}															// JMB
-						else														// JMB
-							baseNames.add( currBase );								// JMB
-					}																// JMB
-				}																	// JMB
-			}																		// JMB
+			if (!isCancelled()){
+				publish("Looking for duplicate files...");
+				Vector<String> baseNames = new Vector<String>();
+				Iterator<String> fileNameItr = fileNames.iterator();
+				while (fileNameItr.hasNext()) {
+					if (!isCancelled()){
+						String fileToCheck = fileNameItr.next();
+
+						// Extract base name from fileToCheck
+						for (int gCount=0; gCount < gene.length; gCount++){
+							if (fileToCheck.indexOf(gene[gCount]) > -1){
+								int geneNameIndex = fileToCheck.indexOf("_"+gene[gCount]);
+								String currBase = fileToCheck.substring(0,geneNameIndex);
+								if ( baseNames.indexOf(currBase) > -1 ) {
+									try {
+										new File(fileToCheck).delete();
+										publish(fileToCheck+" was deleted.");
+									} catch (Exception noFile) {
+										System.err.println("Problem deleting file: "+fileToCheck);
+									}
+								}
+								else
+									baseNames.add( currBase );
+							}
+						}
+					}
+				}
+				if (isCancelled()){
+					publish("\nDuplicate file deletion cancelled by the user. Exiting...\n");
+				}
+			}
 
 			publish("");
 			publish("Finished.");
 			setProgress(100);
+		
 		}
 		catch (IOException ie) 
 		{
@@ -156,39 +210,77 @@ class GetANexusFile implements Runnable
 	private String url;
 	private String[] gene;
 
-	private int geneIndex;				// JMB
+	private int geneIndex;
 	private int count;
-	private int minInd;					// JMB
-	private int maxInd;					// JMB
+	private int minInd;
+	private int maxInd;
 	private int numberTaxa = 0;
 	int[] geneSequence = new int[2];
-	private Vector<String> fileNames = new Vector<String>();					// JMB
+	private Vector<String> fileNames = new Vector<String>();
+	private Vector<String> warnings = new Vector<String>();
+	private boolean extractFlag;
+	private Vector<String> delGeneNames = new Vector<String>();
 	
-	
-	public GetANexusFile(String url, String[] gene, int geneIndex, int count, int minInd, int maxInd, Vector<String> fileNames) // Added gene Index -- JMB
+	public GetANexusFile(String url, String[] gene, int geneIndex, int count, int minInd, int maxInd, Vector<String> fileNames, Vector<String> warnings, boolean extractFlag, Vector<String> delGeneNames) // Added gene Index -- JMB
 	{
 		this.url = url;
 		this.gene = gene;
-		this.geneIndex = geneIndex;		// JMB
+		this.geneIndex = geneIndex;
 		this.count = count;
-		this.minInd = minInd;		// JMB
-		this.maxInd = maxInd;       // JMB
-		this.fileNames = fileNames;	// JMB
+		this.minInd = minInd;
+		this.maxInd = maxInd;
+		this.fileNames = fileNames;
+		this.warnings = warnings;
+		this.extractFlag = extractFlag;
+		this.delGeneNames = delGeneNames;
 	}
 	public void run()
 	{
 		try
 		{
-			// First construct a nexus file with only relative information
-			getNexus(url);
-			// If gene name is not present then delete file, if present then compute Branch Length Priors
+			if (extractFlag)
+				getNexusAndExtract(url);
+			else
+				getNexus(url);
 			isGeneThere(count, minInd, maxInd);
 		}
-		catch (IOException ioe)
-		{}
+		catch (Exception e)
+		{
+			warnings.add("There was a problem parsing file "+url.replace("?format=nexus","")+" with gene name "+gene[geneIndex]+"!");
+			System.out.println("\nThere was a problem parsing file "+url.replace("?format=nexus","")+" with gene name "+gene[geneIndex]+"!\n");
+		}
 	}
 	
 	public void getNexus(String goodUrl) throws IOException
+	{
+		URL input = new URL("http://purl.org/phylo/treebase/phylows/study/TB2:"+goodUrl);
+		BufferedReader br = new BufferedReader(new InputStreamReader(input.openStream()));
+		StringBuffer stringCat = new StringBuffer();
+		String line;
+		while ((line = br.readLine()) != null)
+			stringCat.append(line + "\n");
+		br.close();
+		BufferedWriter writer = new BufferedWriter(new FileWriter(goodUrl.replace("?format=nexus","")+"_"+gene[geneIndex]+".nex"));		
+		String[] in = new String(stringCat).split("\n");
+				
+		// Formats nexus file -- Don't touch
+		for (int i = 0; i < in.length; i++)
+		{		
+			String str = in[i];
+			writer.write(nucSub(str)+"\n");
+			if (str.toLowerCase().indexOf("DIMENSIONS NTAX".toLowerCase()) > -1)
+			{
+				str = str.split("=")[1];
+				int tempNumTaxa = Integer.parseInt(str.substring(0,str.length()-1));
+				if (tempNumTaxa >= minInd && tempNumTaxa <= maxInd)
+					numberTaxa = tempNumTaxa;
+			}
+		}
+		
+		writer.close();
+	}
+
+	public void getNexusAndExtract(String goodUrl) throws IOException
 	{
 		URL input = new URL("http://purl.org/phylo/treebase/phylows/study/TB2:"+goodUrl);
 
@@ -255,13 +347,12 @@ class GetANexusFile implements Runnable
 		catch (NumberFormatException nfe)
 		{
 			geneSequence[0] = 0;
-			geneSequence[0] = 0;
+			geneSequence[1] = 0;
 		}
 				
 		// Formats nexus file -- Don't touch
 		for (int i = 0; i < in.length; i++)
-		{
-						
+		{		
 			str = in[i];
 
 			// Stores taxon set names (e.g., Taxa1, Taxa2, ...) // JMB
@@ -282,7 +373,7 @@ class GetANexusFile implements Runnable
 				writer.write("BEGIN DATA;\n\n");
 				writer.write(str+"\n");
 				start = true;
-				
+			
 				// Stores taxon set names and sizes in d
 				for (int j = 0; j < taxa.size(); j++)
 					d.put(taxa.elementAt(j), ntaxa.elementAt(j));
@@ -312,7 +403,7 @@ class GetANexusFile implements Runnable
 				break;
 			}
 			else if (start)
-			{
+			{				
 				if (str.toLowerCase().indexOf("DIMENSIONS NCHAR".toLowerCase()) > -1 && geneSequence[0] == 0)
 				{
 					writer.write(str.substring(0, str.length()-1) + " NTAX="+numberTaxa+";\n");
@@ -323,7 +414,7 @@ class GetANexusFile implements Runnable
 					writer.write("\tDIMENSIONS NCHAR="+(geneSequence[1]-(geneSequence[0]-1))+" NTAX="+numberTaxa+";\n");
 					continue;
 				}
-				
+			
 				if(str.split("\\s+").length == 2 && geneSequence[0] != 0)
 				{	
 					String alignment = nucSub(str);
@@ -433,23 +524,23 @@ class GetANexusFile implements Runnable
 		
 		return sb.toString();
 	}
-	// Checks to see if gene is there and if there are at least a certain number of taxa
+	
+	// Checks to see if: (1) there is a data matrix, and (3) taxon number meets requirements
 	// Deletes file if either scenario is violated
-	// Otherwise, runs R if box has been checked						// JMB
-	private void isGeneThere(int num, int taxaNum, int maxTaxNum)       // JMB
+	private void isGeneThere(int num, int taxaNum, int maxTaxNum)
 	{
 		try
 		{
 			// String infile = "nexus"+num+".nex";
-			String infile = url.replace("?format=nexus","")+"_"+gene[geneIndex]+".nex";   // JMB
+			String infile = url.replace("?format=nexus","")+"_"+gene[geneIndex]+".nex";
 
 			FileInputStream file = new FileInputStream(infile);
 			DataInputStream in = new DataInputStream(file);
 			BufferedReader br = new BufferedReader(new InputStreamReader(in));
 
 			String line;
-			boolean flag = false;
-			
+			boolean matrixFlag = false;
+			boolean taxNumFlag = true;
 			
 			String patternString = ".*MATRIX.*";
 			Pattern pattern = Pattern.compile(patternString);
@@ -459,21 +550,21 @@ class GetANexusFile implements Runnable
 				Matcher matcher = pattern.matcher(line);
 				if(matcher.matches())
 				{
-					flag = true;
+					matrixFlag = true;
 				}
 			}
-
+			
 			if (taxaNum > numberTaxa || numberTaxa > maxTaxNum)
-				flag = false;
+				taxNumFlag = false;
 			
 			br.close();
 			
-			if (flag == false)
+			if (!matrixFlag || !taxNumFlag)
 			{
-				// File file1 = new File("nexus"+num+".nex");
-				File file1 = new File(url.replace("?format=nexus","")+"_"+gene[geneIndex]+".nex");    // JMB
+				File file1 = new File(url.replace("?format=nexus","")+"_"+gene[geneIndex]+".nex");
+				delGeneNames.add(url.replace("?format=nexus","")+"_"+gene[geneIndex]+".nex");
 				file1.delete();
-				fileNames.remove( url.replace("?format=nexus","")+"_"+gene[geneIndex]+".nex" );		  // JMB
+				fileNames.remove( url.replace("?format=nexus","")+"_"+gene[geneIndex]+".nex" );
 			}
 		}
 		catch(IOException e) 

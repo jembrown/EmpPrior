@@ -11,11 +11,14 @@ public class BranchLengthProgress extends JFrame
 	private JTextArea jtaResult = new JTextArea();
 	private JTextField jtfGene = new JTextField(30);
 	private JButton jbtStart = new JButton("Start!");
-	private JLabel label = new JLabel("Enter a gene name with variations in quotes (e.g., \"cytb\" \"cytochrome_b\"):");     // JMB
-	private JLabel minTaxLabel = new JLabel("Minimum Number of Taxa: ");		// JMB
+	private JLabel label = new JLabel("Enter a gene name with variations in quotes (e.g., \"cytb\" \"cytochrome_b\"):");
+	private JLabel minTaxLabel = new JLabel("Minimum Number of Taxa: ");
 	private JTextField minTaxField = new JTextField(3);
-	private JLabel maxTaxLabel = new JLabel("Maximum Number of Taxa: ");	// JMB
+	private JLabel maxTaxLabel = new JLabel("Maximum Number of Taxa: ");
 	private JTextField maxTaxField = new JTextField(3);
+	private JButton jbtCancel = new JButton("Cancel");
+	private JRadioButton extractButton = new JRadioButton("Attempt to extract gene from Nexus file.");
+	private JLabel emptyLabel = new JLabel("");
 
 	public BranchLengthProgress()
 	{
@@ -29,44 +32,44 @@ public class BranchLengthProgress extends JFrame
 		
 		JPanel bottomPanel = new JPanel();
 
-		// Layout in next section modified to use GridLayout    // JMB
+		// Layout in next section modified to use GridLayout
 
 		bottomPanel.setBorder(BorderFactory.createEmptyBorder(15,15,15,15));
 		GridLayout inputLayout = new GridLayout(0,2);
 		bottomPanel.setLayout(inputLayout);
 		bottomPanel.add(label);
-		// bottomPanel.add(label, BorderLayout.NORTH);
 		bottomPanel.add(jtfGene);
-		// bottomPanel.add(jtfGene, BorderLayout.NORTH);
 		bottomPanel.add(minTaxLabel);
-		// bottomPanel.add(taxaLabel, BorderLayout.WEST);
 		bottomPanel.add(minTaxField);
-		// bottomPanel.add(taxaField, BorderLayout.WEST);
-		bottomPanel.add(maxTaxLabel);     // JMB
-		bottomPanel.add(maxTaxField);     // JMB
+		bottomPanel.add(maxTaxLabel);
+		bottomPanel.add(maxTaxField);
+		bottomPanel.add(extractButton);
+		bottomPanel.add(emptyLabel);
 		bottomPanel.add(jbtStart);
-		// bottomPanel.add(jbtStart, BorderLayout.SOUTH);
+		bottomPanel.add(jbtCancel);
 
 		add(jpb, BorderLayout.NORTH);
 		add(new JScrollPane(jtaResult), BorderLayout.CENTER);
 		add(bottomPanel, BorderLayout.SOUTH);
 		
+		final TreeBaseConnectionMT task = new TreeBaseConnectionMT();
 		
 		jbtStart.addActionListener(new ActionListener()
 		{
 			public void actionPerformed(ActionEvent e)
 			{
-				TreeBaseConnectionMT task = null;
+				String geneString = jtfGene.getText();
 				try
 				{
 					if ( !minTaxField.getText().equals("") && maxTaxField.getText().equals("") )
-						task = new TreeBaseConnectionMT(jtfGene.getText(), minTaxField.getText(), "10000", jtaResult);					// JMB
-					else if ( minTaxField.getText().equals("") && !maxTaxField.getText().equals("") )																// JMB
-						task = new TreeBaseConnectionMT(jtfGene.getText(), "0", maxTaxField.getText(), jtaResult);						// JMB
-					else if ( !minTaxField.getText().equals("") && !maxTaxField.getText().equals("") )																// JMB
-						task = new TreeBaseConnectionMT(jtfGene.getText(), minTaxField.getText(), maxTaxField.getText(), jtaResult);	// JMB
+						task.set(geneString, minTaxField.getText(), "10000", jtaResult, extractButton.isSelected());
+					else if ( minTaxField.getText().equals("") && !maxTaxField.getText().equals("") )
+						task.set(geneString, "0", maxTaxField.getText(), jtaResult, extractButton.isSelected());
+					else if ( !minTaxField.getText().equals("") && !maxTaxField.getText().equals("") )
+						task.set(geneString, minTaxField.getText(), maxTaxField.getText(), jtaResult, extractButton.isSelected());
 					else
-						task = new TreeBaseConnectionMT(jtfGene.getText(), "0", "10000", jtaResult);									// JMB
+						task.set(geneString, "0", "10000", jtaResult, extractButton.isSelected());
+						
 				}
 				catch (IOException e1) 
 				{
@@ -82,8 +85,23 @@ public class BranchLengthProgress extends JFrame
 						}
 					}
 				});
-				task.execute();
+				
+				// Dummy checking for quotation marks. Simple check that just asks if there is: (1) at least one mark and (2) an even number of marks
+				int quoteCount = geneString.length() - geneString.replace("\"", "").length(); // Clever method found online to count characters in a string
+				if ( quoteCount == 0 || quoteCount % 2 != 0 ){
+					task.quoteWarning();
+				} else {
+					task.execute();
+				}
 			}
 		});
+		
+		jbtCancel.addActionListener(new ActionListener(){
+			public void actionPerformed(ActionEvent e)
+			{
+				task.cancel(true);
+			}
+		});
+		
 	}
 }
