@@ -96,7 +96,7 @@ public class TreeBaseConnectionMT extends SwingWorker<String, String>
 						if (!isCancelled()){
 							fileNames.add( urlVector.elementAt(i).replace("?format=nexus","")+"_"+gene[gCount]+".nex" );
 							executor.execute(new GetANexusFile(urlVector.elementAt(i), gene, gCount, i, minInd, maxInd, fileNames, warnings, extractFlag, delGeneNames));
-							// setProgress now accounts for >1 gene		// JMB
+							// setProgress now accounts for >1 gene
 							setProgress(((100 * i / (urlVector.size()*gene.length)) + (100 * gCount / gene.length)));
 							publish("Retrieving nexus"+i+": http://purl.org/phylo/treebase/phylows/study/TB2:"+urlVector.elementAt(i));
 							try{
@@ -284,7 +284,7 @@ class GetANexusFile implements Runnable
 	{
 		URL input = new URL("http://purl.org/phylo/treebase/phylows/study/TB2:"+goodUrl);
 
-		// System.out.println(geneIndex);		// JMB
+		// System.out.println(geneIndex);		// Useful for debugging
 
 		BufferedReader br = new BufferedReader(new InputStreamReader(input.openStream()));
 		
@@ -299,7 +299,7 @@ class GetANexusFile implements Runnable
 		
 		boolean start = false;
 		boolean title = false;
-		boolean parseGeneBounds = false;									// JMB
+		boolean parseGeneBounds = false;
 		
 		Vector<String> taxa = new Vector<String>();
 		Vector<Integer> ntaxa = new Vector<Integer>();
