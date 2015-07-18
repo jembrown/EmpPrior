@@ -10,8 +10,8 @@ public class EmpPriorSearch
 	public static void main(String[] args) 
 	{
 		BranchLengthProgress frame = new BranchLengthProgress();
-		frame.setTitle("EmpPriorSearch");      // Added Search to name - JMB
-		frame.setSize(1000,550);               // JMB
+		frame.setTitle("EmpPriorSearch");      // Added Search to name
+		frame.setSize(1000,550);
 		frame.setLocationRelativeTo(null);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setVisible(true);  

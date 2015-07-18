@@ -209,9 +209,13 @@ for(i in 1:length(input$files)){
 	print(paste("Reading tree for file", input$files[i]))
 	tree = read.nexus(file = input$files[i])
 
+	if (length(tree$edge.length) == 0) {
+		stop("Tree appears to be missing branch lengths. Exiting...")
+	}
+
     dat = data.frame(el = tree$edge.length)
 
-	if(any(dat$el == 0)) {
+	if (any(dat$el == 0)) {
 		stop("Tree must not contain 0-length branches. Exiting...")
 	}
 
