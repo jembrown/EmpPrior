@@ -1,4 +1,4 @@
-![EmpPrior Logo](https://tigerbytes2.lsu.edu/users/jembrown/web/images/EmpPriorLogo.jpg "EmpPrior Logo")
+![EmpPrior Logo](https://raw.githubusercontent.com/jembrown/websiteImages/master/EmpPriorLogo.jpg "EmpPrior Logo")
 
 # EmpPrior
 Using empirical data to inform branch-length priors for Bayesian phylogenetics
