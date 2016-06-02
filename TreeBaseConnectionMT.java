@@ -6,8 +6,6 @@ import java.util.regex.*;
 
 import javax.swing.*;
 
-import org.apache.commons.lang3.StringUtils;
-
 public class TreeBaseConnectionMT extends SwingWorker<String, String>
 {
 	private URL input;
@@ -16,7 +14,7 @@ public class TreeBaseConnectionMT extends SwingWorker<String, String>
 	private int minInd;
 	private int maxInd;
 	private JTextArea result; 
-	public String baseUrl = "http://purl.org/phylo/treebase/phylows/study/TB2:";
+	public String baseUrl = "https://treebase.org/treebase-web/phylows/study/TB2:";
 	private Vector<String> fileNames = new Vector<String>();
 	private Vector<String> warnings = new Vector<String>();
 	private Vector<String> delGeneNames = new Vector<String>();
@@ -68,9 +66,10 @@ public class TreeBaseConnectionMT extends SwingWorker<String, String>
 
 				// Query TreeBase with first array item (first gene entered).
 				publish("Searching for genes with name "+gene[gCount]+"...");
-				input = new URL("http://treebase.org/treebase-web/search/studySearch.html?query=dcterms.abstract=\""+gene[gCount]+"\"");
+				input = new URL("https://treebase.org/treebase-web/search/studySearch.html?query=dcterms.abstract=\""+gene[gCount]+"\"");
+				
 				br = new BufferedReader(new InputStreamReader(input.openStream()));
-
+				
 				String line;
 				Vector<String> urlVector = new Vector<String>();
 
@@ -98,7 +97,7 @@ public class TreeBaseConnectionMT extends SwingWorker<String, String>
 							executor.execute(new GetANexusFile(urlVector.elementAt(i), gene, gCount, i, minInd, maxInd, fileNames, warnings, extractFlag, delGeneNames));
 							// setProgress now accounts for >1 gene
 							setProgress(((100 * i / (urlVector.size()*gene.length)) + (100 * gCount / gene.length)));
-							publish("Retrieving nexus"+i+": http://purl.org/phylo/treebase/phylows/study/TB2:"+urlVector.elementAt(i));
+							publish("Retrieving nexus"+i+": https://treebase.org/treebase-web/phylows/study/TB2:"+urlVector.elementAt(i));
 							try{
 								Thread.sleep(100);
 							}
@@ -253,7 +252,7 @@ class GetANexusFile implements Runnable
 	
 	public void getNexus(String goodUrl) throws IOException
 	{
-		URL input = new URL("http://purl.org/phylo/treebase/phylows/study/TB2:"+goodUrl);
+		URL input = new URL("https://treebase.org/treebase-web/phylows/study/TB2:"+goodUrl);
 		BufferedReader br = new BufferedReader(new InputStreamReader(input.openStream()));
 		StringBuffer stringCat = new StringBuffer();
 		String line;
@@ -282,7 +281,7 @@ class GetANexusFile implements Runnable
 
 	public void getNexusAndExtract(String goodUrl) throws IOException
 	{
-		URL input = new URL("http://purl.org/phylo/treebase/phylows/study/TB2:"+goodUrl);
+		URL input = new URL("https://treebase.org/treebase-web/phylows/study/TB2:"+goodUrl);
 
 		// System.out.println(geneIndex);		// Useful for debugging
 
@@ -510,7 +509,8 @@ class GetANexusFile implements Runnable
 		tokens.put("AGT", "D");
 		tokens.put("ACGT", "N");
 
-		String patternString = "\\{(" + StringUtils.join(tokens.keySet(), "|") + ")\\}";
+		//String patternString = "\\{(" + StringUtils.join(tokens.keySet(), "|") + ")\\}";
+		String patternString = "\\{(AG|CT|AC|GT|CG|AT|ACT|CGT|ACG|AGT|ACGT)\\}";
 		Pattern pattern = Pattern.compile(patternString);
 		Matcher matcher = pattern.matcher(line);
 		
