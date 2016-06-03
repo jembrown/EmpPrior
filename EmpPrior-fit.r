@@ -1,7 +1,7 @@
 #!/usr/bin/Rscript --vanilla --slave
 
 # Usage: ./EmpPrior-fit.r [path/to/nexus1.nex path/to/nexus2.nex || folder=path/to/files folder=path/to/other/files] 
-#                         [outfile=path/to/EmpPrior-fit.out]
+#                         [outfile=path/to/EmpPrior-fit.out] [format=nexus || newick]
 
 # Filenames cannot contain "="
 # Multiple files or folders can be specified
@@ -13,13 +13,15 @@
 #					to exactly match equation 36 from Rannala et al. (2011, MBE, 29:325-335).
 #					The 0.1.1 version of this function returned reasonable parameter estimates
 #					but incorrect likelihoods. The likelihoods returned by 0.2 should be reliable
-#					and are now reported as part of the program output. 
+#					and are now reported as part of the program output.
+#
+# v0.2 -> v0.21: Added the ability to read Newick trees. Also added some basic dummy checking for tree file formats.
 
 # Please send any bug reports to jembrown@lsu.edu.
 
 ### Begin function definitions ###
-# Parse command line arguments
 
+# Parse command line arguments
 parseArgs = function(){
     args = commandArgs(trailingOnly=T)
     args = sapply(args, function(x) as.character(x))
@@ -30,10 +32,17 @@ parseArgs = function(){
         print("EmpPrior-fit: fit branch length distributions to trees or sequence data")
         print("Usage: ./EmpPrior-fit.r [path/to/nexus1.nex path/to/nexus2.nex")
         print("|| infolder=path/to/files/ infolder=path/to/other/files] [outfile=path/to/EmpPrior-fit.out]")
-        print("Trees and sequence data must be in nexus format")
+        print("[format=nexus || newick]")
+        print("Trees must be in either nexus or newick format.")
         quit(save = "no", status = 0)
     }
 
+	# Parsing format string from arguments and then removing from argument list
+	index.format = grep("format",args,ignore.case=TRUE)
+	format = as.character(unlist(strsplit(args[index.format], "="))[2])
+	args = args[-index.format]
+
+	# Parsing outfile name from arguments and then removing from argument list
     index.outfile = grep("outfile=", args, ignore.case=TRUE)
     if(length(index.outfile) == 1){
         outfile = as.character(unlist(strsplit(args[index.outfile], "="))[2])
@@ -47,6 +56,7 @@ parseArgs = function(){
         outfile = NULL
     } else stop("Outfile must not be specified multiple times.")
     
+    # Parsing folder name(s) from arguments and then removing from argument list
     index.folders = grep("folder=", args, ignore.case=TRUE)
     if(length(index.folders) > 0){
         folders = vector()
@@ -67,42 +77,74 @@ parseArgs = function(){
         files = sapply(args, function(x) as.character(x))
     }
 
+	# Sets default option for inferring tree to FALSE for all files
+	file.inferTree = rep(FALSE,length(files))
+
+	# An attempt to do some dummy-checking and print informative error if file format is specified incorrectly.
+	if (toupper(format) == "NEWICK"){
+		if(length(files) > 0){
+			for(i in 1:length(files)){
+				if(!is.na(files[i])){
+					text = readLines(con = files[i])
+					if (length(grep("NEXUS", text, ignore.case=TRUE)) > 0){	# Reject if #NEXUS header present
+						print("One of the input files appears to be in NEXUS format, but NEWICK option specified.")
+						quit(save = "no", status = 1, runLast = FALSE)
+					}		
+				}
+			}
+		}
+	} else if (toupper(format) == "NEXUS"){
+		if(length(files) > 0){
+			for(i in 1:length(files)){
+				if(!is.na(files[i])){
+					text = readLines(con = files[i])
+					if (length(grep("NEXUS", text, ignore.case=TRUE)) == 0){ # Expects #NEXUS header to be present
+						print("One of the input files appears to be in NEWICK format, but NEXUS option specified.")
+						quit(save = "no", status = 1, runLast = FALSE)
+					}		
+				}
+			}
+		}
+
+	}
+
     # Check for DATA and TREES block in each infile
-    file.inferTree = vector(length=length(files))
-    if(length(files) > 0){
-        for(i in 1:length(files)){
-            if(!is.na(files[i])){
-                text = readLines(con = files[i])
-                text.tree = grep("begin trees;", text, ignore.case=TRUE)
-                text.data = grep("begin data;", text, ignore.case=TRUE)
-                if(length(text.tree) > 0){
-                        file.inferTree[i] = FALSE
-                } else if(length(text.data) > 0){
-                    file.inferTree[i] = TRUE
-                } else {
-                    file.inferTree[i] = NA
-                    print(paste("Data in file", files[i], "not recognized. Skipping..."))
-                } 
-            } else {
-                print(paste("Name of infile", files[i], "must be coercible to a character string. Skipping..."))
-                file.inferTree[i] = NA
-            }
-        }
-    } 
-    
-    # Remove unrecognized files from list
-    i = 1
-    while(i <= length(files)){
-        if(is.na(file.inferTree[i])){
-            files = files[-i]
-            file.inferTree = file.inferTree[-i]
-        } else i = i + 1
+    if (toupper(format) == "NEXUS"){
+	    if(length(files) > 0){
+	        for(i in 1:length(files)){
+	            if(!is.na(files[i])){
+	                text = readLines(con = files[i])
+	                text.tree = grep("begin trees;", text, ignore.case=TRUE)
+	                text.data = grep("begin data;", text, ignore.case=TRUE)
+	                if(length(text.tree) > 0){
+	                        file.inferTree[i] = FALSE
+	                } else if(length(text.data) > 0){
+	                    file.inferTree[i] = TRUE
+	                } else {
+	                    file.inferTree[i] = NA
+	                    print(paste("Data in file", files[i], "not recognized. Skipping..."))
+	                } 
+	            } else {
+	                print(paste("Name of infile", files[i], "must be coercible to a character string. Skipping..."))
+	                file.inferTree[i] = NA
+	            }
+	        }
+	    } 
+	    
+	    # Remove unrecognized files from list
+	    i = 1
+	    while(i <= length(files)){
+	        if(is.na(file.inferTree[i])){
+	            files = files[-i]
+	            file.inferTree = file.inferTree[-i]
+	        } else i = i + 1
+	    }
     }
     
     # Make sure at least one file can be analyzed
     if(length(files) == 0) stop("No files selected for analysis")
     
-    return(list(outfile = outfile, files = files, inferTree = file.inferTree))
+    return(list(outfile = outfile, files = files, inferTree = file.inferTree, format = format))
 }
 
 # Negative log likelihood calculators
@@ -207,7 +249,11 @@ library(bbmle, quietly=TRUE)
 
 for(i in 1:length(input$files)){
 	print(paste("Reading tree for file", input$files[i]))
-	tree = read.nexus(file = input$files[i])
+	if (toupper(input$format) == "NEWICK"){
+		tree = read.tree(file = input$files[i])
+	} else {
+		tree = read.nexus(file = input$files[i])
+	}
 
 	if (length(tree$edge.length) == 0) {
 		stop("Tree appears to be missing branch lengths. Exiting...")
